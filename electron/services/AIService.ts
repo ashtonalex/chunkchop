@@ -4,10 +4,10 @@ import { OpenRouterProvider } from './middleware/OpenRouterProvider.js';
 import { withRetry } from './middleware/RetryMiddleware.js';
 import { 
   deduplicateProcesses, 
-  chunkArray, 
   buildOptimizedPrompt,
   ProcessInfo
 } from '../utils/ProcessUtils.js';
+import { createProcessBatches } from '../utils/llmBatching.js';
 import { getErrorMessage } from '../utils/ErrorUtils.js';
 
 // Re-export ProcessInfo for consumers
@@ -67,12 +67,11 @@ export async function analyzeProcessesBatch(processes: ProcessInfo[]): Promise<A
   isProcessing = true;
 
   try {
-    // Split into chunks of max 60 processes to avoid output token limits
-    const BATCH_SIZE = 60;
-    const chunks = chunkArray(uniqueProcesses, BATCH_SIZE);
+    // Use dynamic batching strategy (target 32 processes per batch)
+    const chunks = createProcessBatches(uniqueProcesses);
     
     if (chunks.length > 1) {
-      const message = `Split ${uniqueProcesses.length} processes into ${chunks.length} batches of max ${BATCH_SIZE} processes`;
+      const message = `Split ${uniqueProcesses.length} processes into ${chunks.length} batches using dynamic batching`;
       console.log(`[AI Service] ${message}`);
       logToUI('info', message);
     }
