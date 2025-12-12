@@ -32,7 +32,10 @@ const InspectorPane: React.FC<Props> = ({ process, onTrack }) => {
     );
   }
 
-  const isCritical = process.pid === 0 || process.pid === 4 || process.analysis?.risk_level === 'Critical';
+  // Lock only SYSTEM-critical processes (essential OS), NOT security threats
+  // SystemCritical = essential OS processes (PID 0, 4, System, csrss.exe, etc.)
+  // Critical = security threats (malware, miners) - these should NOT be locked!
+  const isCritical = process.pid === 0 || process.pid === 4 || process.analysis?.risk_level === 'SystemCritical';
 
   // Determine Recommendation Colors and Text
   let recColor = 'text-gray-500';
@@ -40,13 +43,23 @@ const InspectorPane: React.FC<Props> = ({ process, onTrack }) => {
   let safeToTerminate = null; // null = n/a, true = YES, false = NO
 
   if (process.analysis) {
-      if (process.analysis.risk_level === 'Safe' || process.analysis.recommendation?.toLowerCase().includes('terminate')) {
+      if (process.analysis.risk_level === 'SystemCritical') {
+          // System-critical: essential OS processes
+          recColor = 'text-blue-400';
+          recText = 'SYSTEM ESSENTIAL - DO NOT TERMINATE';
+          safeToTerminate = false;
+      } else if (process.analysis.risk_level === 'Critical') {
+          // Security-critical: malware/threats - these SHOULD be terminable!
+          recColor = 'text-risk-crit';
+          recText = 'SECURITY THREAT - TERMINATE RECOMMENDED';
+          safeToTerminate = true;
+      } else if (process.analysis.risk_level === 'Safe' || process.analysis.recommendation?.toLowerCase().includes('terminate')) {
           recColor = 'text-risk-safe';
           recText = 'SAFE TO TERMINATE';
           safeToTerminate = true;
-      } else if (process.analysis.risk_level === 'Critical' || process.analysis.recommendation?.toLowerCase().includes('keep')) {
-          recColor = 'text-risk-crit';
-          recText = 'DO NOT TERMINATE';
+      } else if (process.analysis.recommendation?.toLowerCase().includes('keep')) {
+          recColor = 'text-risk-warn';
+          recText = 'RECOMMEND KEEPING';
           safeToTerminate = false;
       } else {
           recColor = 'text-risk-warn';

@@ -39,11 +39,15 @@ export async function analyzeProcessesBatch(processes: ProcessInfo[]): Promise<A
   }
 
   // Deduplicate processes by name to reduce token usage
+  // Note: This removes multiple instances of the same process name (e.g., multiple chrome.exe instances)
+  // since analysis is stored by process name, not by PID
   const uniqueProcesses = deduplicateProcesses(processes);
-  const duplicatesRemoved = processes.length - uniqueProcesses.length;
+  const duplicateInstances = processes.length - uniqueProcesses.length;
   
-  if (duplicatesRemoved > 0) {
-    console.log(`[AI Service] Removed ${duplicatesRemoved} duplicate process(es). Analyzing ${uniqueProcesses.length} unique processes.`);
+  if (duplicateInstances > 0) {
+    console.log(`[AI Service] Deduplication: ${processes.length} unanalyzed process instances → ${uniqueProcesses.length} unique process names (removed ${duplicateInstances} duplicate instances)`);
+  } else {
+    console.log(`[AI Service] All ${uniqueProcesses.length} unanalyzed processes have unique names, no deduplication needed`);
   }
 
   if (uniqueProcesses.length === 0) {
@@ -255,18 +259,25 @@ export function buildOptimizedPrompt(processes: ProcessInfo[]): string {
 Input Format: "Process Name, CPU Usage (%), Memory Usage (MB)"
 
 Instructions:
-1. Identify the specific application or vendor associated with each executable (e.g., distinguish between "System" and "Third-party").
-2. Assess "Risk" based on the likelihood of the process being malicious or unnecessary telemetry/bloatware.
-3. Determine "Keep" status: Set 'true' ONLY for OS kernels, drivers, and active user applications (browsers, games). Set 'false' for background updaters, telemetry, unused utilities, or high-resource bloat.
-4. If CPU/Memory usage is abnormally high for a specific process type, mention this in the description.
+1. Identify the specific application or vendor associated with each executable.
+2. Assess Risk Category carefully:
+   - SystemCritical: Essential Windows OS processes (e.g., System, Registry, csrss.exe, winlogon.exe, lsass.exe, smss.exe, services.exe, wininit.exe, dwm.exe) or processes with PID 0 or 4. These are LOCKED and cannot be terminated.
+   - Safe: Normal user applications, browsers, games, productivity tools. Safe to terminate.
+   - Bloat: Unnecessary telemetry, updaters, pre-installed junk, background services. Recommended to terminate.
+   - Critical: SECURITY THREATS - malware, miners, suspicious processes, masqueraders. MUST be terminable by user!
+   - Unknown: Unverified or unclear processes. Investigate further.
+3. Determine "Keep" status: Set 'true' ONLY for SystemCritical processes and active user applications. Set 'false' for bloat, updaters, telemetry, and security threats.
+4. If CPU/Memory usage is abnormally high, mention this in the description.
 
 Return ONLY a JSON array containing the analysis. No markdown, no preambles.
 
-Format: [{"n":"process_name.exe","r":"Safe|Bloat|Unknown|Critical","d":"Specific description & context (<200 chars)","k":true|false}]
+Format: [{"n":"process_name.exe","r":"Safe|Bloat|Unknown|SystemCritical|Critical","d":"Specific description & context (<200 chars)","k":true|false}]
 - n: Exact process name from input.
-- r: Risk Category. 'Safe' (Essential/User App), 'Bloat' (Telemetry/Updaters/Pre-installed Junk), 'Unknown' (Unverified/Random string), 'Critical' (Malware/Miner/Masquerader).
+- r: Risk Category (see above). Use SystemCritical for essential OS processes, Critical for security threats.
 - d: Contextual description. Identify vendor/purpose. Mention if resource usage is suspicious. Max 200 chars.
-- k: Keep? true (System Critical/Active User Task) vs false (Safe to Terminate/Performance Gain).
+- k: Keep? true (SystemCritical/Active User App) vs false (Bloat/Updaters/Security Threats).
+
+CRITICAL: Do NOT confuse SystemCritical (essential OS) with Critical (security threats). SystemCritical = do not terminate. Critical = security risk, SHOULD terminate.
 
 Process data:
 ${csvData}

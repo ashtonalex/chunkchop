@@ -26,7 +26,7 @@ const TrackingModal: React.FC<Props> = ({ isOpen, onClose, onClear, processes })
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b border-tech-gray bg-black/40">
             <h2 className="text-xl font-bold text-white tracking-tight flex items-center gap-3 font-mono">
-                <span className="text-neon-cyan">◈</span> TRACKED PROCESS LOGS
+                <span className="text-neon-blue">◈</span> TRACKED PROCESS LOGS
             </h2>
             <button 
                 onClick={onClose}

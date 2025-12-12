@@ -5,6 +5,7 @@ import ProcessList from './components/ProcessList';
 import TreemapViz from './components/TreemapViz';
 import InspectorPane from './components/InspectorPane';
 import TrackingModal from './components/TrackingModal';
+import AnalysisLogsModal, { AnalysisLogEntry } from './components/AnalysisLogsModal';
 // Components import is implicit if file structure matches, but standard import
 
 function App() {
@@ -16,6 +17,8 @@ function App() {
   const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);
   const [trackedProcesses, setTrackedProcesses] = useState<any[]>([]);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isAnalysisLogsOpen, setIsAnalysisLogsOpen] = useState(false);
+  const [analysisLogs, setAnalysisLogs] = useState<AnalysisLogEntry[]>([]);
   
   // Handle tracking process
   const handleTrackProcess = (pid: number) => {
@@ -33,18 +36,41 @@ function App() {
     setTrackedProcesses([]);
   };
 
+  const handleClearAnalysisLogs = () => {
+    setAnalysisLogs([]);
+  };
+
+  const addAnalysisLog = (type: AnalysisLogEntry['type'], message: string) => {
+    const logEntry: AnalysisLogEntry = {
+      id: `${Date.now()}-${Math.random()}`,
+      timestamp: new Date(),
+      type,
+      message
+    };
+    setAnalysisLogs(prev => [...prev, logEntry]);
+  };
+
   const handleBatchAnalyze = async () => {
     setIsAnalyzing(true);
+    // Clear previous logs and open modal
+    setAnalysisLogs([]);
+    setIsAnalysisLogsOpen(true);
+    addAnalysisLog('info', 'Starting batch analysis...');
+    
     try {
       // @ts-ignore
       const result = await window.ipcRenderer.invoke('batch-analyze');
       if (result.success) {
         console.log(`Batch analysis complete: ${result.message}`);
+        addAnalysisLog('success', result.message || `Analysis complete: ${result.count} processes analyzed`);
       } else {
+        addAnalysisLog('error', `Analysis failed: ${result.error}`);
         alert(`Analysis failed: ${result.error}`);
       }
     } catch (error) {
       console.error('Batch analysis error:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      addAnalysisLog('error', `Failed to analyze processes: ${errorMsg}`);
       alert('Failed to analyze processes');
     } finally {
       setIsAnalyzing(false);
@@ -86,7 +112,26 @@ function App() {
     // @ts-ignore
     window.ipcRenderer.on('batch-analysis-complete', (_event, data) => {
       console.log(`Batch analysis completed: ${data.count} processes analyzed`);
+      addAnalysisLog('success', `✓ Batch analysis completed: ${data.count} processes analyzed at ${new Date(data.timestamp).toLocaleTimeString()}`);
       // Processes will update on next poll cycle automatically
+    });
+
+    // Listener for batch analysis progress
+    // @ts-ignore
+    window.ipcRenderer.on('batch-analysis-progress', (_event, data) => {
+      addAnalysisLog('progress', `Processing batch ${data.currentBatch}/${data.totalBatches} (${data.processesInBatch} processes)`);
+    });
+
+    // Listener for AI provider selection
+    // @ts-ignore
+    window.ipcRenderer.on('ai-provider-selected', (_event, data) => {
+      addAnalysisLog('provider', `Using AI provider: ${data.provider}`);
+    });
+
+    // Listener for retry attempts
+    // @ts-ignore
+    window.ipcRenderer.on('batch-analysis-retry', (_event, data) => {
+      addAnalysisLog('retry', `Retrying with ${data.provider}... Attempt ${data.attempt}/${data.maxRetries}`);
     });
     
   }, []);
@@ -193,6 +238,13 @@ function App() {
         onClose={() => setIsTrackingModalOpen(false)} 
         onClear={handleClearTrackedProcesses}
         processes={trackedProcesses} 
+      />
+
+      <AnalysisLogsModal
+        isOpen={isAnalysisLogsOpen}
+        onClose={() => setIsAnalysisLogsOpen(false)}
+        onClear={handleClearAnalysisLogs}
+        logs={analysisLogs}
       />
 
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />

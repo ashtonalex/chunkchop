@@ -152,9 +152,13 @@ ipcMain.handle('batch-analyze', async () => {
   try {
     // Get current processes snapshot
     const processes = await si.processes();
+    const totalProcesses = processes.list.length;
     
     // Filter out processes we already have analysis for
     const needAnalysis = processes.list.filter((p: any) => !getAnalysis(p.name));
+    const alreadyAnalyzed = totalProcesses - needAnalysis.length;
+    
+    console.log(`[Main] Process analysis status: ${totalProcesses} total, ${alreadyAnalyzed} already analyzed, ${needAnalysis.length} need analysis`);
     
     if (needAnalysis.length === 0) {
       return { success: true, message: 'All processes already analyzed', count: 0 };
@@ -167,7 +171,7 @@ ipcMain.handle('batch-analyze', async () => {
       mem: (p.memRss || 0) / 1024 // Convert KB to MB
     }));
 
-    console.log(`[Main] Starting batch analysis for ${processInfo.length} processes...`);
+    console.log(`[Main] Sending ${processInfo.length} unanalyzed processes to AI service (may include duplicate process names)`);
     
     const results = await analyzeProcessesBatch(processInfo);
     
