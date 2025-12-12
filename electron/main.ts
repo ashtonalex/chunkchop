@@ -7,6 +7,7 @@ import { initDB, getAnalysis } from './services/Database.js'; // Use .js extensi
 // Actually, for electron-vite, imports usually work without extensions or with proper resolution.
 // Safe bet: .ts files in electron folder are compiled.
 import { initGemini, analyzeProcessesBatch, isAnalyzing, ProcessInfo, initOpenRouter } from './services/AIService.js';
+import { PowerShellService } from './utils/PowerShellService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -30,6 +31,7 @@ process.env.VITE_PUBLIC = VITE_DEV_SERVER_URL ? path.join(process.env.APP_ROOT, 
 
 let win: BrowserWindow | null
 const store = new Store();
+let powerShellService: PowerShellService | null = null;
 
 function createWindow() {
   win = new BrowserWindow({
@@ -63,19 +65,32 @@ let monitorInterval: NodeJS.Timeout | null = null;
 async function fetchProcesses() {
   if (!win || win.isDestroyed()) return;
   try {
-    const processes = await si.processes();
+    // Fetch both systeminformation data and PowerShell Private Memory data in parallel
+    const [processes, privateMemStats] = await Promise.all([
+      si.processes(),
+      powerShellService?.getPrivateMemoryStats() || Promise.resolve([])
+    ]);
     
-    // Enrich with Analysis Data from DB cache
+    // Create a Map for O(1) lookup of Private Memory by PID
+    const privateMemMap = new Map<number, number>();
+    for (const stat of privateMemStats) {
+      privateMemMap.set(stat.Id, stat.PrivateMemorySize64);
+    }
+    
+    // Enrich with Analysis Data from DB cache and PowerShell Private Memory
     // Memory Metrics Explanation (Windows):
     // - memRss (Resident Set Size): Memory currently in RAM, closest approximation to "Working Set"
     // - memVsz (Virtual Size): Total committed memory including paged to disk
-    // Note: systeminformation doesn't provide Windows "Private Working Set" directly
+    // - privateMemory: TRUE Private Working Set from PowerShell (most accurate)
     const enrichedList = processes.list.map((p: any) => {
       const analysis = getAnalysis(p.name);
+      const privateMemoryBytes = privateMemMap.get(p.pid);
+      
       return { 
         ...p, 
         mem: (p.memRss || 0) * 1024, // Convert KB to Bytes (Working Set/RSS)
         memVirtual: (p.memVsz || 0) * 1024, // Convert KB to Bytes (Virtual Memory)
+        privateMemory: privateMemoryBytes ? privateMemoryBytes / (1024 * 1024) : undefined, // Convert Bytes to MB
         memPct: p.mem, // Preserve original percentage if needed
         analysis: analysis || null 
       };
@@ -165,10 +180,11 @@ ipcMain.handle('batch-analyze', async () => {
     }
 
     // Convert to ProcessInfo format
+    // Use privateMemory from PowerShell if available, otherwise fall back to memRss
     const processInfo: ProcessInfo[] = needAnalysis.map((p: any) => ({
       name: p.name,
       cpu: p.cpu || 0,
-      mem: (p.memRss || 0) / 1024 // Convert KB to MB
+      mem: p.privateMemory || ((p.memRss || 0) / 1024) // Use Private Memory (MB) from PowerShell, fallback to RSS
     }));
 
     console.log(`[Main] Sending ${processInfo.length} unanalyzed processes to AI service (may include duplicate process names)`);
@@ -191,6 +207,7 @@ ipcMain.handle('batch-analyze', async () => {
 // explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   stopMonitoring();
+  powerShellService?.cleanup();
   if (process.platform !== 'darwin') {
     app.quit()
     win = null
@@ -208,6 +225,9 @@ app.on('activate', () => {
 app.whenReady().then(() => {
   initDB();
   
+  // Initialize PowerShell service for Private Memory metrics
+  powerShellService = new PowerShellService();
+  
   const apiKey = store.get('geminiApiKey') as string;
   const openRouterKey = store.get('openRouterApiKey') as string;
   createWindow();
@@ -221,4 +241,9 @@ app.whenReady().then(() => {
   }
   
   startMonitoring();
+});
+
+// Cleanup PowerShell service before quit
+app.on('before-quit', () => {
+  powerShellService?.cleanup();
 });

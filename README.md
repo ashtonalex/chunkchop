@@ -17,7 +17,7 @@ It goes beyond a traditional task manager by using an LLM (Large Language Model)
 - Risk assessments (Safe / Bloat / Critical)
 - “Safe to Kill” recommendations
 
-The goal: replace “End Task” anxiety with AI-backed confidence—while still protecting known system-critical processes.
+The goal: replace “End Task” anxiety with AI-backed confidence while still protecting known system-critical processes.
 
 ## Key Features
 
@@ -45,8 +45,8 @@ The goal: replace “End Task” anxiety with AI-backed confidence—while still
 - Windows 10/11
 - Node.js (LTS recommended)
 - API keys:
-  - **Gemini API key** (required to run analysis)
-  - **OpenRouter API key** (optional; used as primary provider when configured)
+  - **OpenRouter API key** (required to run analysis)
+  - **Gemini API key** (optional; used as fallback when configured)
 
 ### Installation
 
@@ -115,11 +115,11 @@ ChunkChop stores keys locally using `electron-store` (per-user app data). No `.e
 
 ### Required
 
-- **Gemini API key**: used for analysis (Gemini is always available as a fallback, and currently required for analysis to run).
+- **OpenRouter API key**: used for analysis (Gemini is always available as a fallback).
 
 ### Optional
 
-- **OpenRouter API key**: when set, OpenRouter is attempted first; if it fails, ChunkChop falls back to Gemini.
+- **Gemini API key**: when set, OpenRouter is attempted first; if it fails, ChunkChop falls back to Gemini.
 
 ### Local cache
 

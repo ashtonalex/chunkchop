@@ -2,7 +2,7 @@
 export interface ProcessInfo {
   name: string;
   cpu: number;
-  mem: number;
+  mem: number; // Private Working Set in MB (from PowerShell)
 }
 
 
@@ -47,12 +47,15 @@ export function sleep(ms: number): Promise<void> {
  * Uses CSV format and abbreviated JSON keys to reduce cost
  */
 export function buildOptimizedPrompt(processes: ProcessInfo[]): string {
-  // Create CSV data (name,cpu%,memMB)
+  // Create CSV data (name, cpu%, privateMemoryMB)
   const csvData = processes.map(p => `${p.name},${p.cpu.toFixed(1)},${p.mem.toFixed(0)}`).join('\n');
 
   return `Act as a Senior Windows System Administrator and Security Analyst. Analyze the following list of active processes to identify performance bottlenecks, bloatware, and security risks.
 
-Input Format: "Process Name, CPU Usage (%), Memory Usage (MB)"
+Input Format: "Process Name, CPU Usage (%), Private Memory (MB)"
+
+**Definitions:**
+- **Private Memory:** The specific RAM unique to this process. High private memory in background tasks often indicates memory leaks or inefficient bloatware.
 
 Instructions:
 1. Identify the specific application or vendor.
@@ -63,12 +66,13 @@ Instructions:
 
 3. Assess Risk Category (r):
    - **SystemCritical:** ESSENTIAL Windows kernel & OS processes that MUST NEVER be terminated (System, Registry, smss.exe, csrss.exe, wininit.exe, services.exe, lsass.exe, svchost.exe, winlogon.exe, dwm.exe, fontdrvhost.exe, Memory Compression, any process with PID 0 or 4). These are core OS components - terminating them will crash Windows.
-   - **Safe:** Standard user applications (Chrome, Discord, Steam, VS Code) and non-critical Windows utilities. Safe to terminate if needed.
-   - **Bloat:** Pre-installed OEM junk, unnecessary updaters (e.g., Adobe Update Service), telemetry agents, background services that waste resources.
+   - **Safe:** Standard user applications (Chrome, Discord, Steam, VS Code, Antigravity) and non-critical Windows utilities. Safe to terminate if needed.
+   - **Bloat:** Pre-installed OEM junk, unnecessary updaters (e.g., Adobe Update Service), telemetry agents. **FLAG AS BLOAT** if a background service is consuming excessive Private Memory (>150MB) without active user interaction.
    - **Critical:** SECURITY THREATS - malware, miners, trojans, ransomware, or suspicious masquerading processes. These should be terminated immediately.
    - **Unknown:** Unverified process names that cannot be confidently categorized.
 
-4. If CPU/Memory usage is abnormally high for the specific process type (e.g., Notepad using 4GB RAM), note this in the description.
+4. **Resource Analysis:**
+   - Use the **Private Memory** value to determine efficiency. If a simple background utility uses high Private Memory (>100MB), flag it in the description as "Inefficient resource usage".
 
 Return ONLY a JSON array. No markdown.
 
@@ -76,7 +80,7 @@ Format: [{"n":"process_name.exe","r":"SystemCritical|Safe|Bloat|Critical|Unknown
 - n: Exact process name.
 - r: Risk Category (MUST use SystemCritical for essential Windows kernel processes).
 - d: Contextual description. For SystemCritical processes, ALWAYS state "Essential Windows System Process - DO NOT TERMINATE".
-- k: Keep status. true = DO NOT KILL (SystemCritical/User Apps/Essential Processes), false = KILL (Bloat/Malware).
+- k: Keep status. true = DO NOT KILL, false = KILL.
 
 Process data:
 ${csvData}

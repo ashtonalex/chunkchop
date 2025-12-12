@@ -9,6 +9,7 @@ export interface Process {
   cpu: number;
   mem: number; // RSS/Working Set in bytes
   memVirtual?: number; // Virtual memory in bytes (optional)
+  privateMemory?: number; // Private Working Set in MB (from PowerShell)
   analysis?: Analysis;
 }
 
