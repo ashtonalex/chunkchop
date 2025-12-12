@@ -6,7 +6,7 @@ import Store from 'electron-store';
 import { initDB, getAnalysis } from './services/Database.js'; // Use .js extension for ESM usage in TS if needed, or rely on bundler. Electron with TS usually resolves .ts without extension or with .js if using ES modules. Let's try without extension or checking config. Vite usually handles this. But 'type': 'module' in package.json implies ESM. 
 // Actually, for electron-vite, imports usually work without extensions or with proper resolution.
 // Safe bet: .ts files in electron folder are compiled.
-import { initGemini, analyzeProcessesBatch, isAnalyzing, ProcessInfo } from './services/GeminiService.js';
+import { initGemini, analyzeProcessesBatch, isAnalyzing, ProcessInfo, initOpenRouter } from './services/AIService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -131,6 +131,19 @@ ipcMain.handle('get-api-key', () => {
     return store.get('geminiApiKey');
 });
 
+ipcMain.handle('save-openrouter-api-key', async (_event, key: string) => {
+    store.set('openRouterApiKey', key);
+    // Re-init OpenRouter with new key
+    if (win) {
+       initOpenRouter(key, win.webContents);
+    }
+    return true;
+});
+
+ipcMain.handle('get-openrouter-api-key', () => {
+    return store.get('openRouterApiKey');
+});
+
 ipcMain.handle('batch-analyze', async () => {
   if (isAnalyzing()) {
     return { success: false, error: 'Analysis already in progress' };
@@ -192,10 +205,15 @@ app.whenReady().then(() => {
   initDB();
   
   const apiKey = store.get('geminiApiKey') as string;
+  const openRouterKey = store.get('openRouterApiKey') as string;
   createWindow();
   
   if (apiKey && win) {
       initGemini(apiKey, win.webContents);
+  }
+  
+  if (openRouterKey && win) {
+      initOpenRouter(openRouterKey, win.webContents);
   }
   
   startMonitoring();

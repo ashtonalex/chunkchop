@@ -86,8 +86,6 @@ const TreemapViz: React.FC<Props> = ({ processes, onSelect }) => {
           data={data}
           dataKey="value"
           aspectRatio={16 / 9}
-          stroke="#ffffffff"
-          strokeWidth={0.3}
           fill="#ffffffff"  
           onClick={(data) => {
               if (data && data.pid) onSelect(data.pid);

@@ -6,21 +6,28 @@ interface Props {
 }
 
 const SettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
-  const [apiKey, setApiKey] = useState('');
+  const [geminiApiKey, setGeminiApiKey] = useState('');
+  const [openRouterApiKey, setOpenRouterApiKey] = useState('');
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
         // @ts-ignore
         window.ipcRenderer.invoke('get-api-key').then((key: string) => {
-            if (key) setApiKey(key);
+            if (key) setGeminiApiKey(key);
+        });
+        // @ts-ignore
+        window.ipcRenderer.invoke('get-openrouter-api-key').then((key: string) => {
+            if (key) setOpenRouterApiKey(key);
         });
     }
   }, [isOpen]);
 
   const handleSave = async () => {
     // @ts-ignore
-    await window.ipcRenderer.invoke('save-api-key', apiKey);
+    await window.ipcRenderer.invoke('save-api-key', geminiApiKey);
+    // @ts-ignore
+    await window.ipcRenderer.invoke('save-openrouter-api-key', openRouterApiKey);
     setSaved(true);
     setTimeout(() => {
         setSaved(false);
@@ -36,16 +43,30 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
         <h2 className="text-xl font-bold text-white mb-4">Settings</h2>
         
         <div className="mb-4">
+            <label className="block text-gray-400 text-sm mb-2">OpenRouter API Key</label>
+            <input 
+                type="password" 
+                value={openRouterApiKey}
+                onChange={(e) => setOpenRouterApiKey(e.target.value)}
+                placeholder="Enter OpenRouter API Key"
+                className="w-full bg-gray-900 border border-gray-700 text-white p-2 rounded focus:border-blue-500 focus:outline-none"
+            />
+            <p className="text-xs text-gray-500 mt-1">
+                Primary AI model. Get your key from <a href="https://openrouter.ai" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300">OpenRouter</a>.
+            </p>
+        </div>
+
+        <div className="mb-4">
             <label className="block text-gray-400 text-sm mb-2">Gemini API Key</label>
             <input 
                 type="password" 
-                value={apiKey}
-                onChange={(e) => setApiKey(e.target.value)}
+                value={geminiApiKey}
+                onChange={(e) => setGeminiApiKey(e.target.value)}
                 placeholder="Enter AI Studio Key"
                 className="w-full bg-gray-900 border border-gray-700 text-white p-2 rounded focus:border-blue-500 focus:outline-none"
             />
             <p className="text-xs text-gray-500 mt-1">
-                Required for AI analysis. Key is stored locally.
+                Fallback AI model. Key stored locally.
             </p>
         </div>
 
