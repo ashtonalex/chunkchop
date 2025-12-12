@@ -43,22 +43,7 @@ const AnalysisLogsModal: React.FC<Props> = ({ isOpen, onClose, onClear, logs }) 
     }
   };
 
-  const getLogColor = (type: AnalysisLogEntry['type']) => {
-    switch (type) {
-      case 'success':
-        return 'text-green-400 border-green-400/30 bg-green-400/5';
-      case 'error':
-        return 'text-red-400 border-red-400/30 bg-red-400/5';
-      case 'retry':
-        return 'text-yellow-400 border-yellow-400/30 bg-yellow-400/5';
-      case 'progress':
-        return 'text-neon-blue border-neon-blue/30 bg-neon-blue/5';
-      case 'provider':
-        return 'text-neon-cyan border-neon-cyan/30 bg-neon-cyan/5';
-      default:
-        return 'text-gray-400 border-gray-400/30 bg-gray-400/5';
-    }
-  };
+
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', { 
@@ -100,19 +85,45 @@ const AnalysisLogsModal: React.FC<Props> = ({ isOpen, onClose, onClear, logs }) 
               {logs.map((log) => (
                 <div 
                   key={log.id} 
-                  className={`border rounded-sm p-2 flex items-start gap-3 font-mono text-xs transition-all ${getLogColor(log.type)}`}
+                  className={`py-1.5 px-2 flex items-start gap-3 font-mono text-xs transition-all hover:bg-white/5 border-l-2 ${
+                    log.type === 'error' ? 'border-red-500/50' : 
+                    log.type === 'success' ? 'border-green-500/50' : 
+                    log.type === 'retry' ? 'border-yellow-500/50' : 
+                    log.type === 'provider' ? 'border-neon-cyan/50' : 
+                    'border-transparent'
+                  }`}
                 >
-                  <span className="text-base leading-none mt-0.5">{getLogIcon(log.type)}</span>
+                  <span className={`text-base leading-none mt-0.5 ${
+                    log.type === 'error' ? 'text-red-400' : 
+                    log.type === 'success' ? 'text-green-400' : 
+                    log.type === 'retry' ? 'text-yellow-400' : 
+                    log.type === 'progress' ? 'text-neon-blue' : 
+                    log.type === 'provider' ? 'text-neon-cyan' : 
+                    'text-gray-500'
+                  }`}>{getLogIcon(log.type)}</span>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-baseline gap-2">
-                      <span className="text-[10px] opacity-60 font-mono tabular-nums">
+                      <span className="text-[10px] text-gray-600 font-mono tabular-nums">
                         {formatTime(log.timestamp)}
                       </span>
-                      <span className="text-[9px] uppercase opacity-40 tracking-wider">
-                        {log.type}
-                      </span>
+                      {log.type !== 'info' && (
+                        <span className={`text-[9px] uppercase tracking-wider ${
+                          log.type === 'error' ? 'text-red-500/70' : 
+                          log.type === 'success' ? 'text-green-500/70' : 
+                          log.type === 'retry' ? 'text-yellow-500/70' : 
+                          log.type === 'progress' ? 'text-neon-blue/70' : 
+                          log.type === 'provider' ? 'text-neon-cyan/70' : 
+                          'text-gray-600'
+                        }`}>
+                          {log.type}
+                        </span>
+                      )}
                     </div>
-                    <div className="mt-1 leading-relaxed break-words">
+                    <div className={`mt-0.5 leading-relaxed break-words ${
+                      log.type === 'error' ? 'text-red-300' : 
+                      log.type === 'success' ? 'text-green-300' : 
+                      'text-gray-300'
+                    }`}>
                       {log.message}
                     </div>
                   </div>

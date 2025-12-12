@@ -133,6 +133,12 @@ function App() {
     window.ipcRenderer.on('batch-analysis-retry', (_event, data) => {
       addAnalysisLog('retry', `Retrying with ${data.provider}... Attempt ${data.attempt}/${data.maxRetries}`);
     });
+
+    // Listener for generic batch analysis logs
+    // @ts-ignore
+    window.ipcRenderer.on('batch-analysis-log', (_event, data) => {
+      addAnalysisLog(data.type || 'info', data.message);
+    });
     
   }, []);
 

@@ -45,7 +45,15 @@ export async function analyzeProcessesBatch(processes: ProcessInfo[]): Promise<A
   const duplicateInstances = processes.length - uniqueProcesses.length;
   
   if (duplicateInstances > 0) {
-    console.log(`[AI Service] Deduplication: ${processes.length} unanalyzed process instances → ${uniqueProcesses.length} unique process names (removed ${duplicateInstances} duplicate instances)`);
+    const message = `Deduplication: ${processes.length} unanalyzed process instances → ${uniqueProcesses.length} unique process names (removed ${duplicateInstances} duplicate instances)`;
+    console.log(`[AI Service] ${message}`);
+    
+    if (webContents && !webContents.isDestroyed()) {
+      webContents.send('batch-analysis-log', {
+        type: 'info',
+        message: message
+      });
+    }
   } else {
     console.log(`[AI Service] All ${uniqueProcesses.length} unanalyzed processes have unique names, no deduplication needed`);
   }
@@ -62,7 +70,11 @@ export async function analyzeProcessesBatch(processes: ProcessInfo[]): Promise<A
     const chunks = chunkArray(uniqueProcesses, BATCH_SIZE);
     
     if (chunks.length > 1) {
-      console.log(`[AI Service] Split ${uniqueProcesses.length} processes into ${chunks.length} batches of max ${BATCH_SIZE} processes`);
+      const message = `Split ${uniqueProcesses.length} processes into ${chunks.length} batches of max ${BATCH_SIZE} processes`;
+      console.log(`[AI Service] ${message}`);
+      if (webContents && !webContents.isDestroyed()) {
+        webContents.send('batch-analysis-log', { type: 'info', message });
+      }
     }
 
     const allResults: AnalysisResult[] = [];
@@ -70,7 +82,11 @@ export async function analyzeProcessesBatch(processes: ProcessInfo[]): Promise<A
     // Process each chunk sequentially
     for (let i = 0; i < chunks.length; i++) {
       const chunk = chunks[i];
-      console.log(`[AI Service] Processing batch ${i + 1}/${chunks.length} (${chunk.length} processes)...`);
+      const message = `Processing batch ${i + 1}/${chunks.length} (${chunk.length} processes)...`;
+      console.log(`[AI Service] ${message}`);
+      if (webContents && !webContents.isDestroyed()) {
+        webContents.send('batch-analysis-log', { type: 'info', message });
+      }
       
       // Notify UI of batch progress
       if (webContents && !webContents.isDestroyed()) {
@@ -93,7 +109,6 @@ export async function analyzeProcessesBatch(processes: ProcessInfo[]): Promise<A
       });
     }
 
-    console.log(`[AI Service] Completed analysis of ${allResults.length} processes across ${chunks.length} batch(es)`);
     return allResults;
 
   } catch (error) {
@@ -199,7 +214,18 @@ async function analyzeProcessChunk(processes: ProcessInfo[]): Promise<AnalysisRe
       console.log(`[AI Service] Gemini analysis completed in ${elapsed}ms`);
 
       // Clean markdown code blocks if any
-      const jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      let jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+      
+      // Extract only the JSON array portion (handles extra text before/after)
+      const arrayStart = jsonStr.indexOf('[');
+      const arrayEnd = jsonStr.lastIndexOf(']');
+      
+      if (arrayStart === -1 || arrayEnd === -1 || arrayStart >= arrayEnd) {
+        throw new Error('No valid JSON array found in response');
+      }
+      
+      jsonStr = jsonStr.substring(arrayStart, arrayEnd + 1);
+      
       const data = JSON.parse(jsonStr) as Array<{
         n: string;
         r: 'Safe' | 'Bloat' | 'Unknown' | 'Critical';
@@ -261,23 +287,22 @@ Input Format: "Process Name, CPU Usage (%), Memory Usage (MB)"
 Instructions:
 1. Identify the specific application or vendor associated with each executable.
 2. Assess Risk Category carefully:
-   - SystemCritical: Essential Windows OS processes (e.g., System, Registry, csrss.exe, winlogon.exe, lsass.exe, smss.exe, services.exe, wininit.exe, dwm.exe) or processes with PID 0 or 4. These are LOCKED and cannot be terminated.
-   - Safe: Normal user applications, browsers, games, productivity tools. Safe to terminate.
+   - Safe: Normal user applications, browsers, games, productivity tools, AND essential Windows OS processes (e.g., System, Registry, csrss.exe, winlogon.exe, lsass.exe, smss.exe, services.exe, wininit.exe, dwm.exe, conhost.exe, sihost.exe, taskhostw.exe). Use "k":true for essential OS processes to lock them.
    - Bloat: Unnecessary telemetry, updaters, pre-installed junk, background services. Recommended to terminate.
-   - Critical: SECURITY THREATS - malware, miners, suspicious processes, masqueraders. MUST be terminable by user!
+   - Critical: SECURITY THREATS - malware, miners, suspicious processes, masqueraders. MUST be terminable by user! Use "k":false for these.
    - Unknown: Unverified or unclear processes. Investigate further.
-3. Determine "Keep" status: Set 'true' ONLY for SystemCritical processes and active user applications. Set 'false' for bloat, updaters, telemetry, and security threats.
+3. Determine "Keep" status: Set 'true' ONLY for essential OS processes (PID 0, 4, or critical system processes) and active user applications. Set 'false' for bloat, updaters, telemetry, and security threats.
 4. If CPU/Memory usage is abnormally high, mention this in the description.
 
 Return ONLY a JSON array containing the analysis. No markdown, no preambles.
 
-Format: [{"n":"process_name.exe","r":"Safe|Bloat|Unknown|SystemCritical|Critical","d":"Specific description & context (<200 chars)","k":true|false}]
+Format: [{"n":"process_name.exe","r":"Safe|Bloat|Unknown|Critical","d":"Specific description & context (<200 chars)","k":true|false}]
 - n: Exact process name from input.
-- r: Risk Category (see above). Use SystemCritical for essential OS processes, Critical for security threats.
-- d: Contextual description. Identify vendor/purpose. Mention if resource usage is suspicious. Max 200 chars.
-- k: Keep? true (SystemCritical/Active User App) vs false (Bloat/Updaters/Security Threats).
+- r: Risk Category (see above). Use Safe for both user apps and essential OS processes. Use Critical ONLY for security threats.
+- d: Contextual description. Identify vendor/purpose. For essential OS processes, mention "Essential Windows system process". Mention if resource usage is suspicious. Max 200 chars.
+- k: Keep? true (Essential OS processes/Active User Apps) vs false (Bloat/Updaters/Security Threats).
 
-CRITICAL: Do NOT confuse SystemCritical (essential OS) with Critical (security threats). SystemCritical = do not terminate. Critical = security risk, SHOULD terminate.
+CRITICAL: Essential OS processes should be marked as "r":"Safe" with "k":true. Security threats should be marked as "r":"Critical" with "k":false.
 
 Process data:
 ${csvData}
