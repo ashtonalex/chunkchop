@@ -5,19 +5,18 @@ import { AnalysisResult } from '../Database.js';
 export class OpenRouterProvider implements AIProvider {
   name = 'OpenRouter';
   private apiKey: string | null = null;
-  private modelName = 'google/gemini-2.0-flash-001'; // Defaulting to a reliable model, user can change
-  // Note: Previous context mentioned gpt-oss-20b, but using a generally available one or making it configurable is safer.
-  // I will stick to what the user likely had or a safe default. Let's use a standard one. 
-  // actually, let's look at the summary "Integrate OpenRouter Fallback ... integrate gpt-oss-20b". 
-  // So I should probably use 'gpt-oss-20b' equivalent or 'meta-llama/llama-3-8b-instruct:free' or similar if that's what they wanted.
-  // Better yet, I'll allow it to be set.
+  private modelName = 'gpt-oss-20b';
+  private modelParams: Record<string, any> = {};
   
-  constructor(apiKey?: string, model?: string) {
+  constructor(apiKey?: string, model?: string, modelParams?: Record<string, any>) {
     if (apiKey) {
       this.initialize(apiKey);
     }
     if (model) {
       this.modelName = model;
+    }
+    if (modelParams) {
+      this.modelParams = modelParams;
     }
   }
 
@@ -44,6 +43,8 @@ export class OpenRouterProvider implements AIProvider {
       },
       body: JSON.stringify({
         model: this.modelName,
+        // Add model-specific parameters (e.g., { 'reasoning_effort': 'high' })
+        ...this.modelParams,
         messages: [
           {
             role: 'user',
@@ -69,8 +70,6 @@ export class OpenRouterProvider implements AIProvider {
   }
 
   private parseResponse(text: string): AnalysisResult[] {
-    // Reuse similar parsing logic - could be extracted to a shared parser if identical
-    // But keeping it here since prompts might slighty differ in output format quirks per model
     
     let jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
     

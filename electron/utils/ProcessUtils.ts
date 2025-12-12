@@ -55,24 +55,28 @@ export function buildOptimizedPrompt(processes: ProcessInfo[]): string {
 Input Format: "Process Name, CPU Usage (%), Memory Usage (MB)"
 
 Instructions:
-1. Identify the specific application or vendor associated with each executable.
-2. Assess Risk Category carefully:
-   - Safe: Normal user applications, browsers, games, productivity tools, AND essential Windows OS processes (e.g., System, Registry, csrss.exe, winlogon.exe, lsass.exe, smss.exe, services.exe, wininit.exe, dwm.exe, conhost.exe, sihost.exe, taskhostw.exe). Use "k":true for essential OS processes to lock them.
-   - Bloat: Unnecessary telemetry, updaters, pre-installed junk, background services. Recommended to terminate.
-   - Critical: SECURITY THREATS - malware, miners, suspicious processes, masqueraders. MUST be terminable by user! Use "k":false for these.
-   - Unknown: Unverified or unclear processes. Investigate further.
-3. Determine "Keep" status: Set 'true' ONLY for essential OS processes (PID 0, 4, or critical system processes) and active user applications. Set 'false' for bloat, updaters, telemetry, and security threats.
-4. If CPU/Memory usage is abnormally high, mention this in the description.
+1. Identify the specific application or vendor.
+2. **MANDATORY 'KEEP' (k) RULE:**
+   - You MUST set "k":true for ALL Windows Kernel & System processes, including but not limited to: System, Registry, smss.exe, csrss.exe, wininit.exe, services.exe, lsass.exe, svchost.exe, winlogon.exe, dwm.exe, spoolsv.exe, explorer.exe, taskhostw.exe, conhost.exe, sihost.exe, fontdrvhost.exe, Memory Compression.
+   - You MUST set "k":true for active user applications (Browsers, Games, IDEs, Media Players) unless they are frozen/responsive.
+   - Set "k":false ONLY for: Bloatware, background updaters, telemetry agents, malware, and non-essential utilities.
 
-Return ONLY a JSON array containing the analysis. No markdown, no preambles.
+3. Assess Risk Category (r):
+   - **SystemCritical:** ESSENTIAL Windows kernel & OS processes that MUST NEVER be terminated (System, Registry, smss.exe, csrss.exe, wininit.exe, services.exe, lsass.exe, svchost.exe, winlogon.exe, dwm.exe, fontdrvhost.exe, Memory Compression, any process with PID 0 or 4). These are core OS components - terminating them will crash Windows.
+   - **Safe:** Standard user applications (Chrome, Discord, Steam, VS Code) and non-critical Windows utilities. Safe to terminate if needed.
+   - **Bloat:** Pre-installed OEM junk, unnecessary updaters (e.g., Adobe Update Service), telemetry agents, background services that waste resources.
+   - **Critical:** SECURITY THREATS - malware, miners, trojans, ransomware, or suspicious masquerading processes. These should be terminated immediately.
+   - **Unknown:** Unverified process names that cannot be confidently categorized.
 
-Format: [{"n":"process_name.exe","r":"Safe|Bloat|Unknown|Critical","d":"Specific description & context (<200 chars)","k":true|false}]
-- n: Exact process name from input.
-- r: Risk Category (see above). Use Safe for both user apps and essential OS processes. Use Critical ONLY for security threats.
-- d: Contextual description. Identify vendor/purpose. For essential OS processes, mention "Essential Windows system process". Mention if resource usage is suspicious. Max 200 chars.
-- k: Keep? true (Essential OS processes/Active User Apps) vs false (Bloat/Updaters/Security Threats).
+4. If CPU/Memory usage is abnormally high for the specific process type (e.g., Notepad using 4GB RAM), note this in the description.
 
-CRITICAL: Essential OS processes should be marked as "r":"Safe" with "k":true. Security threats should be marked as "r":"Critical" with "k":false.
+Return ONLY a JSON array. No markdown.
+
+Format: [{"n":"process_name.exe","r":"SystemCritical|Safe|Bloat|Critical|Unknown","d":"description <400 chars","k":true|false}]
+- n: Exact process name.
+- r: Risk Category (MUST use SystemCritical for essential Windows kernel processes).
+- d: Contextual description. For SystemCritical processes, ALWAYS state "Essential Windows System Process - DO NOT TERMINATE".
+- k: Keep status. true = DO NOT KILL (SystemCritical/User Apps/Essential Processes), false = KILL (Bloat/Malware).
 
 Process data:
 ${csvData}

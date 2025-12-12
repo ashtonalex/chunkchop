@@ -52,7 +52,7 @@ function createWindow() {
   }
 
   // Always open DevTools for debugging (remove in final production)
-  win.webContents.openDevTools()
+  // win.webContents.openDevTools()
 }
 
 // --- System Monitoring ---

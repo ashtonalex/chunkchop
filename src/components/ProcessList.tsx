@@ -58,6 +58,7 @@ const ProcessList: React.FC<Props> = ({ processes, selectedPid, onSelect }) => {
               className="bg-tech-black/50 border border-tech-gray rounded px-2 py-1 text-white focus:outline-none focus:border-neon-blue cursor-pointer"
             >
               <option value="All">ALL RISKS</option>
+              <option value="SystemCritical">SYSTEM CRITICAL</option>
               <option value="Critical">CRITICAL</option>
               <option value="Bloat">BLOAT</option>
               <option value="Safe">SAFE</option>
@@ -102,6 +103,7 @@ const ProcessList: React.FC<Props> = ({ processes, selectedPid, onSelect }) => {
       <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden scrollbar-thin scrollbar-thumb-tech-gray scrollbar-track-transparent">
         {filteredProcesses.map((p) => {
            let statusColor = 'bg-gray-700';
+           if (p.analysis?.risk_level === 'SystemCritical') statusColor = 'bg-neon-blue shadow-[0_0_8px_#00BFFF]';
            if (p.analysis?.risk_level === 'Safe') statusColor = 'bg-risk-safe shadow-[0_0_5px_#39FF14]';
            if (p.analysis?.risk_level === 'Bloat') statusColor = 'bg-risk-warn shadow-[0_0_5px_#FFD700]';
            if (p.analysis?.risk_level === 'Critical') statusColor = 'bg-risk-crit shadow-[0_0_8px_#FF4500] animate-pulse';

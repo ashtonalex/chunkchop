@@ -12,7 +12,7 @@ export function initDB() {
   db.exec(`
     CREATE TABLE IF NOT EXISTS process_analysis (
       process_name TEXT PRIMARY KEY,
-      risk_level TEXT CHECK( risk_level IN ('Safe', 'Bloat', 'Unknown', 'Critical') ),
+      risk_level TEXT CHECK( risk_level IN ('SystemCritical', 'Safe', 'Bloat', 'Unknown', 'Critical') ),
       description TEXT,
       recommendation TEXT,
       last_updated DATETIME DEFAULT CURRENT_TIMESTAMP
@@ -23,7 +23,7 @@ export function initDB() {
 
 export interface AnalysisResult {
   process_name: string;
-  risk_level: 'Safe' | 'Bloat' | 'Unknown' | 'Critical';
+  risk_level: 'SystemCritical' | 'Safe' | 'Bloat' | 'Unknown' | 'Critical';
   description: string;
   recommendation: string;
   last_updated?: string;
