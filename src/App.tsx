@@ -6,6 +6,7 @@ import TreemapViz from './components/TreemapViz';
 import InspectorPane from './components/InspectorPane';
 import TrackingModal from './components/TrackingModal';
 import AnalysisLogsModal, { AnalysisLogEntry } from './components/AnalysisLogsModal';
+import { FilterOptions } from './types';
 // Components import is implicit if file structure matches, but standard import
 
 function App() {
@@ -19,6 +20,13 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isAnalysisLogsOpen, setIsAnalysisLogsOpen] = useState(false);
   const [analysisLogs, setAnalysisLogs] = useState<AnalysisLogEntry[]>([]);
+  
+  const [filters, setFilters] = useState<FilterOptions>({
+    searchTerm: '',
+    riskFilter: 'All',
+    minCpu: 0,
+    minMem: 0
+  });
   
   // Handle tracking process
   const handleTrackProcess = (pid: number) => {
@@ -154,7 +162,9 @@ function App() {
         <ProcessList 
             processes={processes} 
             selectedPid={selectedPid} 
-            onSelect={setSelectedPid} 
+            onSelect={setSelectedPid}
+            filters={filters}
+            onFilterChange={setFilters}
         />
       </div>
 
@@ -231,7 +241,11 @@ function App() {
           </div>
 
           <div className="flex-1 relative overflow-hidden">
-            <TreemapViz processes={treemapProcesses} onSelect={setSelectedPid} />
+            <TreemapViz 
+              processes={treemapProcesses} 
+              onSelect={setSelectedPid} 
+              filters={filters}
+            />
           </div>
           <InspectorPane 
               process={selectedProcess} 

@@ -1,27 +1,21 @@
 import React from 'react';
 
-interface Process {
-  pid: number;
-  name: string;
-  cpu: number;
-  mem: number; // RSS/Working Set in bytes
-  memVirtual?: number; // Virtual memory in bytes (optional)
-  analysis?: {
-    risk_level: string;
-  };
-}
+import { Process, FilterOptions } from '../types';
 
 interface Props {
   processes: Process[];
   selectedPid: number | null;
   onSelect: (pid: number) => void;
+  filters: FilterOptions;
+  onFilterChange: (filters: FilterOptions) => void;
 }
 
-const ProcessList: React.FC<Props> = ({ processes, selectedPid, onSelect }) => {
-  const [searchTerm, setSearchTerm] = React.useState('');
-  const [riskFilter, setRiskFilter] = React.useState('All');
-  const [minCpu, setMinCpu] = React.useState(0);
-  const [minMem, setMinMem] = React.useState(0);
+const ProcessList: React.FC<Props> = ({ processes, selectedPid, onSelect, filters, onFilterChange }) => {
+  const { searchTerm, riskFilter, minCpu, minMem } = filters;
+  
+  const updateFilter = (key: keyof FilterOptions, value: any) => {
+    onFilterChange({ ...filters, [key]: value });
+  };
 
   const filteredProcesses = React.useMemo(() => {
     return processes.filter(p => {
@@ -49,12 +43,12 @@ const ProcessList: React.FC<Props> = ({ processes, selectedPid, onSelect }) => {
               type="text"
               placeholder="SEARCH PROCESS..."
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => updateFilter('searchTerm', e.target.value)}
               className="flex-1 bg-tech-black/50 border border-tech-gray rounded px-2 py-1 text-neon-blue focus:outline-none focus:border-neon-blue placeholder-gray-600"
             />
             <select
               value={riskFilter}
-              onChange={(e) => setRiskFilter(e.target.value)}
+              onChange={(e) => updateFilter('riskFilter', e.target.value)}
               className="bg-tech-black/50 border border-tech-gray rounded px-2 py-1 text-white focus:outline-none focus:border-neon-blue cursor-pointer"
             >
               <option value="All">ALL RISKS</option>
@@ -78,7 +72,7 @@ const ProcessList: React.FC<Props> = ({ processes, selectedPid, onSelect }) => {
                 min="0"
                 max="100"
                 value={minCpu}
-                onChange={(e) => setMinCpu(Number(e.target.value))}
+                onChange={(e) => updateFilter('minCpu', Number(e.target.value))}
                 className="w-full accent-neon-blue h-1 bg-tech-gray rounded-lg appearance-none cursor-pointer"
               />
             </div>
@@ -93,7 +87,7 @@ const ProcessList: React.FC<Props> = ({ processes, selectedPid, onSelect }) => {
                 max="2000"
                 step="50"
                 value={minMem}
-                onChange={(e) => setMinMem(Number(e.target.value))}
+                onChange={(e) => updateFilter('minMem', Number(e.target.value))}
                 className="w-full accent-neon-blue h-1 bg-tech-gray rounded-lg appearance-none cursor-pointer"
               />
             </div>

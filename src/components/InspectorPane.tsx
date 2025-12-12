@@ -80,7 +80,7 @@ const InspectorPane: React.FC<Props> = ({ process, onTrack }) => {
                     ${process.analysis.risk_level === 'Safe' ? 'bg-risk-safe/10 border-risk-safe text-risk-safe' : ''}
                     ${process.analysis.risk_level === 'Bloat' ? 'bg-risk-warn/10 border-risk-warn text-risk-warn' : ''}
                     ${process.analysis.risk_level === 'Critical' ? 'bg-risk-crit/10 border-risk-crit text-risk-crit shadow-[0_0_10px_rgba(255,69,0,0.4)]' : ''}
-                    ${process.analysis.risk_level === 'SystemCritical' ? 'bg-neon-blue/10 border-neon-blue text-neon-blue shadow-[0_0_10px_rgba(0,191,255,0.4)]' : ''}
+                    ${process.analysis.risk_level === 'SystemCritical' ? 'bg-neon-blue/10 border-neon-blue text-neon-blue' : ''}
                     ${process.analysis.risk_level === 'Unknown' ? 'bg-gray-500/10 border-gray-500 text-gray-400' : ''}
                  `}>
                      {process.analysis.risk_level}

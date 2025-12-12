@@ -1,28 +1,29 @@
 import React, { useMemo } from 'react';
 import { ResponsiveContainer, Treemap, Tooltip } from 'recharts';
 
-interface Process {
-  pid: number;
-  name: string;
-  cpu: number;
-  mem: number; // RSS/Working Set
-  memVirtual?: number; // Virtual memory (optional)
-  analysis?: {
-    risk_level: string;
-  };
-}
+import { Process, FilterOptions } from '../types';
 
 interface Props {
   processes: Process[];
   onSelect: (pid: number) => void;
+  filters: FilterOptions;
 }
 
 
-const TreemapViz: React.FC<Props> = ({ processes, onSelect }) => {
+const TreemapViz: React.FC<Props> = ({ processes, onSelect, filters }) => {
   // Transform data for Treemap
   const data = useMemo(() => {
-    // Filter out processes under 40MB for visualization clarity
-    const validProcesses = processes.filter(p => p.mem > 30 * 1024 * 1024);
+    const { searchTerm, riskFilter, minCpu, minMem } = filters;
+
+    // Filter processes based on all controls
+    const validProcesses = processes.filter(p => {
+        const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesRisk = riskFilter === 'All' || p.analysis?.risk_level === riskFilter;
+        const matchesCpu = p.cpu >= minCpu;
+        const matchesMem = (p.mem / 1024 / 1024) >= minMem;
+        
+        return matchesSearch && matchesRisk && matchesCpu && matchesMem;
+    });
     
     // Color mapping for risk levels (Muted Professional Palette)
     const colorMap: Record<string, string> = {
@@ -66,7 +67,7 @@ const TreemapViz: React.FC<Props> = ({ processes, onSelect }) => {
     grouped.children = grouped.children.filter(g => g.children.length > 0);
     
     return [grouped];
-  }, [processes]);
+  }, [processes, filters]);
 
   if (!data || !data[0] || !data[0].children || data[0].children.length === 0) {
       return (
