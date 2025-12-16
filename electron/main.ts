@@ -89,11 +89,11 @@ async function fetchProcesses() {
       
       return { 
         ...p, 
-        mem: (p.memRss || 0) * 1024, // Convert KB to Bytes (Working Set/RSS)
-        memRss: (p.memRss || 0) * 1024, // Explicitly set memRss for Dev Mode
-        memVirtual: (p.memVsz || 0) * 1024, // Convert KB to Bytes (Virtual Memory)
-        privateMemory: privateMemoryBytes ? privateMemoryBytes / (1024 * 1024) : undefined, // Convert Bytes to MB
-        memPct: p.mem, // Preserve original percentage if needed
+        mem: (p.memRss || 0) * 1024, 
+        memRss: (p.memRss || 0) * 1024, 
+        memVirtual: (p.memVsz || 0) * 1024, 
+        privateMemory: privateMemoryBytes ? privateMemoryBytes / (1024 * 1024) : undefined, 
+        memPct: p.mem, 
         analysis: analysis || null 
       };
     });
@@ -248,8 +248,8 @@ ipcMain.handle('batch-analyze-devmode', async () => {
       return {
         name: p.name,
         cpu: p.cpu || 0,
-        mem: privateMemoryMB, // Private Working Set
-        memRss: totalWorkingSetMB // Total Working Set
+        mem: privateMemoryMB, 
+        memRss: totalWorkingSetMB 
       };
     });
 
@@ -268,9 +268,6 @@ ipcMain.handle('batch-analyze-devmode', async () => {
   }
 });
 
-// Quit when all windows are closed, except on macOS. There, it's common
-// for applications and their menu bar to stay active until the user quits
-// explicitly with Cmd + Q.
 app.on('window-all-closed', () => {
   stopMonitoring();
   powerShellService?.cleanup();
@@ -281,8 +278,6 @@ app.on('window-all-closed', () => {
 })
 
 app.on('activate', () => {
-  // On OS X it's common to re-create a window in the app when the
-  // dock icon is clicked and there are no other windows open.
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow()
   }
