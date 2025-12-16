@@ -17,14 +17,14 @@
 
 ## Introduction
 
-**ChunkChop** redefines the Task Manager experience for Windows users. Say goodbye to "End Task" anxiety—ChunkChop uses **Large Language Model (LLM) analysis** to intelligently classify running processes, giving you clear **"Safe to Kill"** recommendations backed by AI confidence.
+**ChunkChop** redefines the Task Manager experience for Windows users. Say goodbye to "End Task" anxiety. ChunkChop uses **Large Language Model (LLM) analysis** to intelligently classify running processes, giving you clear **"Safe to Kill"** recommendations backed by AI confidence.
 
-For power users and engineers, ChunkChop goes deeper with a dedicated **Dev Mode** that provides detailed memory profiling, visualizing Private Working Set vs. Total Working Set to help identify memory leaks and shared library issues.
+For power users and engineers, ChunkChop goes deeper with a dedicated **Dev Mode** that provides detailed memory profiling, visualising Private Working Set vs. Total Working Set to help identify memory leaks and shared library issues.
 
 ### Why ChunkChop?
 
 - **AI-Powered Decisions:** Stop guessing. Get instant, intelligent classification of every process as Safe, Bloat, or Critical.
-- **Visual Clarity:** Interactive Treemap visualization makes resource hogs immediately obvious—size represents RAM, color represents risk.
+- **Visual Clarity:** Interactive Treemap visualization makes resource hogs immediately obvious. Size represents RAM, color represents risk.
 - **Deep Insights:** Engineers can toggle Dev Mode for memory stack analysis, spotting leaks and inefficiencies at a glance.
 - **Built-in Safety:** Hardcoded protection for critical system processes ensures you never accidentally crash your system.
 
@@ -33,9 +33,9 @@ For power users and engineers, ChunkChop goes deeper with a dedicated **Dev Mode
 ## Key Features
 
 ### Visual Resource Map
-An interactive **Treemap** powered by Recharts provides an intuitive visualization of your system's resource usage:
+An interactive **Treemap** powered by Recharts provides an intuitive visualisation of your system's resource usage:
 - **Size** = RAM consumption (larger blocks = more memory)
-- **Color** = Risk Level (Critical, Bloat, Safe, Unknown, Unanalyzed)
+- **Color** = Risk Level (Critical, Bloat, Safe, Unknown, Unanalysed)
 - Click any process to inspect details and take action
 
 ### AI Copilot Analysis
@@ -52,13 +52,13 @@ Combines multiple data sources for maximum accuracy:
 
 ### Smart Caching
 Uses **`better-sqlite3`** to cache LLM analysis results locally:
-- Minimizes API costs by avoiding redundant analysis
+- Minimises API costs by avoiding redundant analysis
 - Reduces latency for previously analyzed processes
 - Persistent storage survives application restarts
 
 ### Dev Mode (Memory Profiler)
 A toggleable advanced mode for engineers featuring:
-- **Stacked Bar Charts** visualizing Private Working Set vs. Total Working Set (Shared Delta)
+- **Stacked Bar Charts** visualising Private Working Set vs. Total Working Set (Shared Delta)
 - Memory leak detection through pattern analysis
 - Shared library issue identification
 - Detailed process classification: `Leak`, `Inefficient`, `Normal`, `Suspicious`
