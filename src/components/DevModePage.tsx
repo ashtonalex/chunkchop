@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import DevModeInspector from './DevModeInspector';
+import MemoryBreakdownChart from './MemoryBreakdownChart';
 
 interface DevModeAnalysis {
   type: 'Leak' | 'Inefficient' | 'Normal' | 'Suspicious';
@@ -207,21 +208,7 @@ const DevModePage: React.FC<Props> = ({ processes, onExitDevMode, onAnalyze, isA
         {/* Inspector/Visualization Area */}
         <div className="flex-1 flex flex-col bg-gray-900/30">
           <div className="flex-1 p-6 overflow-y-auto">
-            {selectedProcess ? (
-              <div className="space-y-4">
-                <h2 className="text-lg font-semibold text-white">Process Details</h2>
-                <div className="text-sm text-gray-400">
-                  Select a process from the list to view detailed memory analysis.
-                </div>
-              </div>
-            ) : (
-              <div className="flex items-center justify-center h-full text-gray-600">
-                <div className="text-center">
-                  <div className="text-4xl mb-2 opacity-30">📊</div>
-                  <div className="text-sm">Select a process to view analysis</div>
-                </div>
-              </div>
-            )}
+            <MemoryBreakdownChart processes={processes} maxProcesses={15} />
           </div>
           
           {/* Bottom Inspector */}
