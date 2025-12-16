@@ -3,10 +3,10 @@ import { fileURLToPath } from 'node:url'
 import path from 'node:path'
 import si from 'systeminformation'
 import Store from 'electron-store';
-import { initDB, getAnalysis } from './services/Database.js'; // Use .js extension for ESM usage in TS if needed, or rely on bundler. Electron with TS usually resolves .ts without extension or with .js if using ES modules. Let's try without extension or checking config. Vite usually handles this. But 'type': 'module' in package.json implies ESM. 
+import { initDB, getAnalysis, getDevModeAnalysis } from './services/Database.js'; // Use .js extension for ESM usage in TS if needed, or rely on bundler. Electron with TS usually resolves .ts without extension or with .js if using ES modules. Let's try without extension or checking config. Vite usually handles this. But 'type': 'module' in package.json implies ESM. 
 // Actually, for electron-vite, imports usually work without extensions or with proper resolution.
 // Safe bet: .ts files in electron folder are compiled.
-import { initGemini, analyzeProcessesBatch, isAnalyzing, ProcessInfo, initOpenRouter } from './services/AIService.js';
+import { initGemini, analyzeProcessesBatch, isAnalyzing, ProcessInfo, initOpenRouter, analyzeDevModeBatch } from './services/AIService.js';
 import { PowerShellService } from './utils/PowerShellService.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -82,13 +82,15 @@ async function fetchProcesses() {
     // - memRss (Resident Set Size): Memory currently in RAM, closest approximation to "Working Set"
     // - memVsz (Virtual Size): Total committed memory including paged to disk
     // - privateMemory: TRUE Private Working Set from PowerShell (most accurate)
+    const devModeEnabled = store.get('devModeEnabled', false) as boolean;
     const enrichedList = processes.list.map((p: any) => {
-      const analysis = getAnalysis(p.name);
+      const analysis = devModeEnabled ? getDevModeAnalysis(p.name) : getAnalysis(p.name);
       const privateMemoryBytes = privateMemMap.get(p.pid);
       
       return { 
         ...p, 
         mem: (p.memRss || 0) * 1024, // Convert KB to Bytes (Working Set/RSS)
+        memRss: (p.memRss || 0) * 1024, // Explicitly set memRss for Dev Mode
         memVirtual: (p.memVsz || 0) * 1024, // Convert KB to Bytes (Virtual Memory)
         privateMemory: privateMemoryBytes ? privateMemoryBytes / (1024 * 1024) : undefined, // Convert Bytes to MB
         memPct: p.mem, // Preserve original percentage if needed
@@ -149,9 +151,7 @@ ipcMain.handle('get-api-key', () => {
 ipcMain.handle('save-openrouter-api-key', async (_event, key: string) => {
     store.set('openRouterApiKey', key);
     // Re-init OpenRouter with new key
-    if (win) {
-       initOpenRouter(key, win.webContents);
-    }
+    initOpenRouter(key);
     return true;
 });
 
@@ -202,6 +202,72 @@ ipcMain.handle('batch-analyze', async () => {
   }
 });
 
+// Dev Mode IPC Handlers
+ipcMain.handle('get-dev-mode', () => {
+  return store.get('devModeEnabled', false);
+});
+
+ipcMain.handle('set-dev-mode', (_event, enabled: boolean) => {
+  store.set('devModeEnabled', enabled);
+  return true;
+});
+
+ipcMain.handle('batch-analyze-devmode', async () => {
+  if (isAnalyzing()) {
+    return { success: false, error: 'Analysis already in progress' };
+  }
+
+  try {
+    const processes = await si.processes();
+    const [_, privateMemStats] = await Promise.all([
+      Promise.resolve(),
+      powerShellService?.getPrivateMemoryStats() || Promise.resolve([])
+    ]);
+    
+    const privateMemMap = new Map<number, number>();
+    for (const stat of privateMemStats) {
+      privateMemMap.set(stat.Id, stat.PrivateMemorySize64);
+    }
+    
+    const totalProcesses = processes.list.length;
+    const needAnalysis = processes.list.filter((p: any) => !getDevModeAnalysis(p.name));
+    const alreadyAnalyzed = totalProcesses - needAnalysis.length;
+    
+    console.log(`[Main] [Dev Mode] Process analysis status: ${totalProcesses} total, ${alreadyAnalyzed} already analyzed, ${needAnalysis.length} need analysis`);
+    
+    if (needAnalysis.length === 0) {
+      return { success: true, message: 'All processes already analyzed in Dev Mode', count: 0 };
+    }
+
+    // Convert to ProcessInfo with both PWS and WS
+    const processInfo: ProcessInfo[] = needAnalysis.map((p: any) => {
+      const privateMemoryBytes = privateMemMap.get(p.pid);
+      const privateMemoryMB = privateMemoryBytes ? privateMemoryBytes / (1024 * 1024) : (p.memRss || 0) / 1024;
+      const totalWorkingSetMB = (p.memRss || 0) / 1024; // KB to MB
+      
+      return {
+        name: p.name,
+        cpu: p.cpu || 0,
+        mem: privateMemoryMB, // Private Working Set
+        memRss: totalWorkingSetMB // Total Working Set
+      };
+    });
+
+    console.log(`[Main] [Dev Mode] Sending ${processInfo.length} unanalyzed processes to AI service`);
+    
+    const results = await analyzeDevModeBatch(processInfo);
+    
+    return { 
+      success: true, 
+      count: results.length,
+      message: `Successfully analyzed ${results.length} processes in Dev Mode`
+    };
+  } catch (error: any) {
+    console.error('[Main] [Dev Mode] Batch analysis failed:', error);
+    return { success: false, error: error.message };
+  }
+});
+
 // Quit when all windows are closed, except on macOS. There, it's common
 // for applications and their menu bar to stay active until the user quits
 // explicitly with Cmd + Q.
@@ -236,8 +302,8 @@ app.whenReady().then(() => {
       initGemini(apiKey, win.webContents);
   }
   
-  if (openRouterKey && win) {
-      initOpenRouter(openRouterKey, win.webContents);
+  if (openRouterKey) {
+      initOpenRouter(openRouterKey);
   }
   
   startMonitoring();

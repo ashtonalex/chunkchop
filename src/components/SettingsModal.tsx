@@ -3,9 +3,11 @@ import React, { useState, useEffect } from 'react';
 interface Props {
   isOpen: boolean;
   onClose: () => void;
+  devModeEnabled?: boolean;
+  onDevModeChange?: (enabled: boolean) => void;
 }
 
-const SettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
+const SettingsModal: React.FC<Props> = ({ isOpen, onClose, devModeEnabled = false, onDevModeChange }) => {
   const [geminiApiKey, setGeminiApiKey] = useState('');
   const [openRouterApiKey, setOpenRouterApiKey] = useState('');
   const [saved, setSaved] = useState(false);
@@ -28,6 +30,8 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
     await window.ipcRenderer.invoke('save-api-key', geminiApiKey);
     // @ts-ignore
     await window.ipcRenderer.invoke('save-openrouter-api-key', openRouterApiKey);
+    // @ts-ignore
+    await window.ipcRenderer.invoke('set-dev-mode', devModeEnabled);
     setSaved(true);
     setTimeout(() => {
         setSaved(false);
@@ -68,6 +72,28 @@ const SettingsModal: React.FC<Props> = ({ isOpen, onClose }) => {
             <p className="text-xs text-gray-500 mt-1">
                 Fallback AI model. Key stored locally.
             </p>
+        </div>
+
+        <div className="mb-4 flex items-center justify-between border-t border-gray-700 pt-4 mt-4">
+          <div>
+            <label className="block text-gray-400 text-sm font-semibold mb-1">Dev Mode</label>
+            <p className="text-xs text-gray-500">
+              Advanced memory profiling for engineers (dual-metric analysis)
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => onDevModeChange?.(!devModeEnabled)}
+            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 focus:ring-offset-gray-800 ${
+              devModeEnabled ? 'bg-blue-600' : 'bg-gray-600'
+            }`}
+          >
+            <span
+              className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                devModeEnabled ? 'translate-x-6' : 'translate-x-1'
+              }`}
+            />
+          </button>
         </div>
 
         <div className="flex justify-end gap-2">

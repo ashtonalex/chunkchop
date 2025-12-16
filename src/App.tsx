@@ -20,6 +20,7 @@ function App() {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isAnalysisLogsOpen, setIsAnalysisLogsOpen] = useState(false);
   const [analysisLogs, setAnalysisLogs] = useState<AnalysisLogEntry[]>([]);
+  const [devModeEnabled, setDevModeEnabled] = useState(false);
   
   const [filters, setFilters] = useState<FilterOptions>({
     searchTerm: '',
@@ -63,11 +64,12 @@ function App() {
     // Clear previous logs and open modal
     setAnalysisLogs([]);
     setIsAnalysisLogsOpen(true);
-    addAnalysisLog('info', 'Starting batch analysis...');
+    addAnalysisLog('info', `Starting ${devModeEnabled ? 'Dev Mode' : 'standard'} batch analysis...`);
     
     try {
       // @ts-ignore
-      const result = await window.ipcRenderer.invoke('batch-analyze');
+      const ipcChannel = devModeEnabled ? 'batch-analyze-devmode' : 'batch-analyze';
+      const result = await window.ipcRenderer.invoke(ipcChannel);
       if (result.success) {
         console.log(`Batch analysis complete: ${result.message}`);
         addAnalysisLog('success', result.message || `Analysis complete: ${result.count} processes analyzed`);
@@ -146,6 +148,12 @@ function App() {
     // @ts-ignore
     window.ipcRenderer.on('batch-analysis-log', (_event, data) => {
       addAnalysisLog(data.type || 'info', data.message);
+    });
+    
+    // Load Dev Mode state on mount
+    // @ts-ignore
+    window.ipcRenderer.invoke('get-dev-mode').then((enabled: boolean) => {
+      setDevModeEnabled(enabled);
     });
     
   }, []);
@@ -267,7 +275,12 @@ function App() {
         logs={analysisLogs}
       />
 
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
+      <SettingsModal 
+        isOpen={isSettingsOpen} 
+        onClose={() => setIsSettingsOpen(false)}
+        devModeEnabled={devModeEnabled}
+        onDevModeChange={setDevModeEnabled}
+      />
     </div>
   )
 }

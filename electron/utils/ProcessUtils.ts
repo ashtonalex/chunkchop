@@ -3,6 +3,7 @@ export interface ProcessInfo {
   name: string;
   cpu: number;
   mem: number; // Private Working Set in MB (from PowerShell)
+  memRss?: number; // Total Working Set in MB (for Dev Mode)
 }
 
 
@@ -83,6 +84,46 @@ Format: [{"n":"process_name.exe","r":"SystemCritical|Safe|Bloat|Critical|Unknown
 - k: Keep status. true = DO NOT KILL, false = KILL.
 
 Process data:
+${csvData}
+
+Return JSON array only:`;
+}
+
+/**
+ * Build Dev Mode prompt for advanced memory profiling
+ * Uses dual-metric analysis (PWS + WS) to detect leaks and inefficiencies
+ */
+export function buildDevModePrompt(processes: ProcessInfo[]): string {
+  // Create CSV data (name, cpu%, privateMemoryMB, totalWorkingSetMB)
+  const csvData = processes.map(p => {
+    const pws = p.mem.toFixed(0);
+    const ws = p.memRss ? p.memRss.toFixed(0) : pws; // Fallback to PWS if WS unavailable
+    return `${p.name},${p.cpu.toFixed(1)},${pws},${ws}`;
+  }).join('\n');
+
+  return `Act as a Senior Systems Profiler and Kernel Engineer. Analyze the following process memory snapshots to detect leaks, inefficiency, and abnormal shared resource usage.
+
+Input Format: "Process Name, CPU Usage (%), Private Memory (PWS in MB), Total Working Set (WS in MB)"
+
+**Definitions:**
+- **Shared Delta:** (WS - PWS). Represents memory shared with other processes (DLLs, memory-mapped files).
+- **Leak Indicator:** High PWS that grows over time (historical context not provided here, infer from PWS/WS ratio for known app types).
+
+**Instructions:**
+1. **Analyze Efficiency:** Compare PWS vs WS.
+   - If (WS >> PWS) for a non-system app, flag as "High Shared Dependency" (potential unoptimized library usage).
+   - If (PWS ~= WS) for a complex app (like Electron), this is normal.
+2. **Detect Anomalies:**
+   - **Bloated PWS:** Flag simple utilities (Notepad, Calc) with PWS >100MB as "Inefficient/Leak".
+   - **Suspicious Shared Usage:** Flag unknown processes with high Shared Delta as "Potential DLL Injection".
+3. **Generate Technical Recommendation:**
+   - Instead of "Kill/Keep", provide specific debugging advice (e.g., "Check handle release", "Investigate shared library linkage", "Monitor for Paging").
+
+Return ONLY a JSON array.
+
+Format: [{"n":"process_name","type":"Leak|Inefficient|Normal|Suspicious","analysis":"Technical insight <200 chars","recommendation":"Debug action"}]
+
+Process Data:
 ${csvData}
 
 Return JSON array only:`;

@@ -1,10 +1,11 @@
-import { saveAnalysis, AnalysisResult } from './Database.js';
+import { saveAnalysis, AnalysisResult, saveDevModeAnalysis, DevModeAnalysisResult } from './Database.js';
 import { GeminiProvider } from './middleware/GeminiProvider.js';
 import { OpenRouterProvider } from './middleware/OpenRouterProvider.js';
 import { withRetry } from './middleware/RetryMiddleware.js';
 import { 
   deduplicateProcesses, 
   buildOptimizedPrompt,
+  buildDevModePrompt,
   ProcessInfo
 } from '../utils/ProcessUtils.js';
 import { createProcessBatches } from '../utils/llmBatching.js';
@@ -206,3 +207,201 @@ export function isAnalyzing(): boolean {
 
 // Re-export buildOptimizedPrompt if it was consumed externally
 export { buildOptimizedPrompt };
+
+// ===== DEV MODE ANALYSIS =====
+
+/**
+ * Analyze processes in Dev Mode for advanced memory profiling
+ * Uses dual-metric analysis (PWS + WS) to detect leaks and inefficiencies
+ */
+export async function analyzeDevModeBatch(processes: ProcessInfo[]): Promise<DevModeAnalysisResult[]> {
+  if (!geminiProvider.isInitialized()) {
+    throw new Error('Gemini API not initialized. Please set API key first.');
+  }
+
+  if (isProcessing) {
+    throw new Error('Batch analysis already in progress');
+  }
+
+  if (processes.length === 0) {
+    return [];
+  }
+
+  // Deduplicate processes by name
+  const uniqueProcesses = deduplicateProcesses(processes);
+  const duplicateInstances = processes.length - uniqueProcesses.length;
+  
+  if (duplicateInstances > 0) {
+    const message = `[Dev Mode] Deduplication: ${processes.length} → ${uniqueProcesses.length} unique processes`;
+    console.log(`[AI Service] ${message}`);
+    logToUI('info', message);
+  }
+
+  if (uniqueProcesses.length === 0) {
+    return [];
+  }
+
+  isProcessing = true;
+
+  try {
+    const chunks = createProcessBatches(uniqueProcesses);
+    
+    if (chunks.length > 1) {
+      const message = `[Dev Mode] Split ${uniqueProcesses.length} processes into ${chunks.length} batches`;
+      console.log(`[AI Service] ${message}`);
+      logToUI('info', message);
+    }
+
+    const allResults: DevModeAnalysisResult[] = [];
+
+    for (let i = 0; i < chunks.length; i++) {
+      const chunk = chunks[i];
+      const message = `[Dev Mode] Processing batch ${i + 1}/${chunks.length} (${chunk.length} processes)...`;
+      console.log(`[AI Service] ${message}`);
+      logToUI('info', message);
+      
+      if (webContents && !webContents.isDestroyed()) {
+        webContents.send('batch-analysis-progress', {
+          currentBatch: i + 1,
+          totalBatches: chunks.length,
+          processesInBatch: chunk.length
+        });
+      }
+
+      const results = await analyzeDevModeChunk(chunk);
+      allResults.push(...results);
+      
+      // Save results immediately
+      saveDevModeBatchAnalysis(results);
+      console.log(`[AI Service] Saved ${results.length} Dev Mode analysis results to database`);
+    }
+
+    if (webContents && !webContents.isDestroyed()) {
+      webContents.send('batch-analysis-complete', {
+        count: allResults.length,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    return allResults;
+
+  } catch (error) {
+    console.error('[AI Service] Dev Mode batch analysis failed:', error);
+    throw error;
+  } finally {
+    isProcessing = false;
+  }
+}
+
+/**
+ * Analyze a single chunk in Dev Mode with provider fallback
+ */
+async function analyzeDevModeChunk(processes: ProcessInfo[]): Promise<DevModeAnalysisResult[]> {
+  const prompt = buildDevModePrompt(processes);
+  let openRouterError: any = null;
+
+  // Try OpenRouter first
+  if (openRouterProvider.isInitialized()) {
+    console.log('[AI Service] [Dev Mode] Attempting analysis with OpenRouter');
+    notifyProviderSelection('OpenRouter (Dev Mode)');
+
+    try {
+      return await withRetry(
+        () => analyzeDevModeWithProvider(openRouterProvider, prompt),
+        {
+          maxRetries: 3,
+          onRetry: (attempt) => notifyRetry('OpenRouter', attempt, 3)
+        }
+      );
+    } catch (error) {
+      openRouterError = error;
+      console.warn(`[AI Service] [Dev Mode] OpenRouter failed: ${getErrorMessage(error)}. Fallback to Gemini.`);
+    }
+  }
+
+  // Fallback to Gemini
+  console.log('[AI Service] [Dev Mode] Attempting analysis with Gemini');
+  notifyProviderSelection('Gemini (Dev Mode Fallback)');
+
+  try {
+    return await withRetry(
+      () => analyzeDevModeWithProvider(geminiProvider, prompt),
+      {
+        maxRetries: 3,
+        onRetry: (attempt) => notifyRetry('Gemini', attempt, 3)
+      }
+    );
+  } catch (geminiError) {
+    const combinedError = new Error(
+      `Both AI providers failed in Dev Mode. OpenRouter: ${openRouterError ? getErrorMessage(openRouterError) : 'Skipped'}. Gemini: ${getErrorMessage(geminiError)}`
+    );
+    throw combinedError;
+  }
+}
+
+/**
+ * Generic Dev Mode analysis with any provider
+ */
+async function analyzeDevModeWithProvider(provider: any, prompt: string): Promise<DevModeAnalysisResult[]> {
+  const model = provider.genAI ? provider.genAI.getGenerativeModel({ model: provider.modelName || 'gemini-2.5-flash' }) : null;
+  
+  if (!model) {
+    // OpenRouter path
+    const result = await provider.analyze([], prompt);
+    return parseDevModeResponse(JSON.stringify(result));
+  }
+  
+  // Gemini path
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  const text = response.text();
+  return parseDevModeResponse(text);
+}
+
+/**
+ * Parse Dev Mode JSON response
+ */
+function parseDevModeResponse(text: string): DevModeAnalysisResult[] {
+  let jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();
+  
+  const arrayStart = jsonStr.indexOf('[');
+  const arrayEnd = jsonStr.lastIndexOf(']');
+  
+  if (arrayStart === -1 || arrayEnd === -1 || arrayStart >= arrayEnd) {
+    throw new Error('No valid JSON array found in Dev Mode response');
+  }
+  
+  jsonStr = jsonStr.substring(arrayStart, arrayEnd + 1);
+  
+  try {
+    const data = JSON.parse(jsonStr) as Array<{
+      n: string;
+      type: 'Leak' | 'Inefficient' | 'Normal' | 'Suspicious';
+      analysis: string;
+      recommendation: string;
+    }>;
+
+    return data.map(item => ({
+      process_name: item.n,
+      type: item.type,
+      analysis: item.analysis,
+      recommendation: item.recommendation
+    }));
+  } catch (e) {
+    console.error('Failed to parse Dev Mode response:', jsonStr);
+    throw new Error('Failed to parse JSON response from Dev Mode analysis');
+  }
+}
+
+/**
+ * Save Dev Mode batch results
+ */
+function saveDevModeBatchAnalysis(results: DevModeAnalysisResult[]) {
+  results.forEach(result => {
+    try {
+      saveDevModeAnalysis(result);
+    } catch (error) {
+      console.error(`[AI Service] Failed to save Dev Mode analysis for ${result.process_name}:`, error);
+    }
+  });
+}

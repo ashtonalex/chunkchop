@@ -10,6 +10,7 @@ export interface Process {
   mem: number; // RSS/Working Set in bytes
   memVirtual?: number; // Virtual memory in bytes (optional)
   privateMemory?: number; // Private Working Set in MB (from PowerShell)
+  memRss?: number; // Total Working Set in bytes (for Dev Mode calculations)
   analysis?: Analysis;
 }
 
