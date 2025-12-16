@@ -69,6 +69,48 @@ export class OpenRouterProvider implements AIProvider {
     return this.parseResponse(text);
   }
 
+  /**
+   * Get raw completion text from OpenRouter (for Dev Mode parsing)
+   */
+  async getRawCompletion(prompt: string): Promise<string> {
+    if (!this.apiKey) {
+      throw new Error('OpenRouter API key not set');
+    }
+
+    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${this.apiKey}`,
+        'HTTP-Referer': 'https://github.com/chunkchop/react-ts',
+        'X-Title': 'ChunkChop Process Analyzer',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        model: this.modelName,
+        ...this.modelParams,
+        messages: [
+          {
+            role: 'user',
+            content: prompt
+          }
+        ]
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`OpenRouter API refused: ${response.status} ${response.statusText} - ${errorText}`);
+    }
+
+    const data = await response.json();
+    
+    if (!data.choices || data.choices.length === 0 || !data.choices[0].message) {
+      throw new Error('Invalid response format from OpenRouter');
+    }
+
+    return data.choices[0].message.content;
+  }
+
   private parseResponse(text: string): AnalysisResult[] {
     
     let jsonStr = text.replace(/```json/g, '').replace(/```/g, '').trim();

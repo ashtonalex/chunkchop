@@ -3,6 +3,12 @@ export interface Analysis {
   [key: string]: any;
 }
 
+export interface DevModeAnalysis {
+  type: 'Leak' | 'Inefficient' | 'Normal' | 'Suspicious';
+  analysis: string;
+  recommendation: string;
+}
+
 export interface Process {
   pid: number;
   name: string;

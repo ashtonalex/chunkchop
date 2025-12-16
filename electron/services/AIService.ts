@@ -346,9 +346,9 @@ async function analyzeDevModeWithProvider(provider: any, prompt: string): Promis
   const model = provider.genAI ? provider.genAI.getGenerativeModel({ model: provider.modelName || 'gemini-2.5-flash' }) : null;
   
   if (!model) {
-    // OpenRouter path
-    const result = await provider.analyze([], prompt);
-    return parseDevModeResponse(JSON.stringify(result));
+    // OpenRouter path - use getRawCompletion for Dev Mode (different JSON format)
+    const text = await provider.getRawCompletion(prompt);
+    return parseDevModeResponse(text);
   }
   
   // Gemini path

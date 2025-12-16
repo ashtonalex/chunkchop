@@ -6,6 +6,7 @@ import TreemapViz from './components/TreemapViz';
 import InspectorPane from './components/InspectorPane';
 import TrackingModal from './components/TrackingModal';
 import AnalysisLogsModal, { AnalysisLogEntry } from './components/AnalysisLogsModal';
+import DevModePage from './components/DevModePage';
 import { FilterOptions } from './types';
 // Components import is implicit if file structure matches, but standard import
 
@@ -159,6 +160,38 @@ function App() {
   }, []);
 
   const selectedProcess = processes.find(p => p.pid === selectedPid) || null;
+
+  const handleExitDevMode = async () => {
+    setDevModeEnabled(false);
+    // @ts-ignore
+    await window.ipcRenderer.invoke('set-dev-mode', false);
+  };
+
+  // Conditional rendering: Dev Mode vs Standard Mode
+  if (devModeEnabled) {
+    return (
+      <>
+        <DevModePage
+          processes={processes}
+          onExitDevMode={handleExitDevMode}
+          onAnalyze={handleBatchAnalyze}
+          isAnalyzing={isAnalyzing}
+        />
+        <SettingsModal 
+          isOpen={isSettingsOpen} 
+          onClose={() => setIsSettingsOpen(false)}
+          devModeEnabled={devModeEnabled}
+          onDevModeChange={setDevModeEnabled}
+        />
+        <AnalysisLogsModal
+          isOpen={isAnalysisLogsOpen}
+          onClose={() => setIsAnalysisLogsOpen(false)}
+          onClear={handleClearAnalysisLogs}
+          logs={analysisLogs}
+        />
+      </>
+    );
+  }
 
   return (
     <div className="flex h-screen bg-tech-black text-text-main overflow-hidden font-sans relative selection:bg-neon-blue selection:text-black">
